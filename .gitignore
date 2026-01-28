@@ -1,0 +1,18 @@
+# Python virtual environment
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Database files
+*.db
+*.sqlite3
+
+# Redundant root scripts
+test.py
+review.py
+keyword-extraction.py
+vader.py
+vibe_score.py

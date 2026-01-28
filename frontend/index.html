@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>VibeCheck</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #0f172a;
+      color: white;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .business-card {
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .business-info {
+      flex: 1;
+    }
+
+    .business-name {
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .business-category {
+      color: #94a3b8;
+    }
+
+    .vibe-container {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .vibe-meter {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: conic-gradient(#ef4444 0deg, #ef4444 360deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 20px;
+      color: white;
+    }
+
+    canvas {
+      background: transparent;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔥 VibeCheck</h1>
+  <div id="business-list"></div>
+
+  <script>
+    const API_BASE = "http://127.0.0.1:8000"; // Change when deployed
+
+    async function fetchBusinesses() {
+      const container = document.getElementById("business-list");
+      container.innerHTML = "<p>Loading vibes...</p>";
+
+      try {
+        const res = await fetch(`${API_BASE}/businesses/`);
+        if (!res.ok) {
+          throw new Error(`Failed to fetch: ${res.statusText}`);
+        }
+        const businesses = await res.json();
+        renderBusinesses(businesses);
+      } catch (error) {
+        console.error("Error fetching businesses:", error);
+        container.innerHTML = `<p style="color: #ef4444;">Could not load business data. Is the API running?</p>`;
+      }
+    }
+
+    function getVibeColor(score) {
+      if (score < 60) return "#ef4444";  // Red (bad)
+      if (score < 100) return "#f97316"; // Orange
+      if (score < 140) return "#eab308"; // Yellow
+      if (score < 170) return "#22c55e"; // Green
+      return "#6366f1";                  // Purple/Blue (great vibe)
+    }
+
+    function createVibeMeter(score) {
+      const color = getVibeColor(score);
+      const degrees = (score / 200) * 360; // Adjust for 0-200 scale
+
+      const meter = document.createElement("div");
+      meter.className = "vibe-meter";
+      meter.style.background = `conic-gradient(${color} ${degrees}deg, #334155 ${degrees}deg)`;
+      meter.innerText = Math.round(score);
+
+      return meter;
+    }
+
+    function createSparkline(canvasId, dataPoints) {
+      const ctx = document.getElementById(canvasId).getContext("2d");
+      new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: Array(dataPoints.length).fill(""),
+          datasets: [{
+            data: dataPoints,
+            borderColor: "#38bdf8",
+            borderWidth: 2,
+            fill: false,
+            tension: 0.4,
+            pointRadius: 0
+          }]
+        },
+        options: {
+          responsive: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: { display: false },
+            y: { display: false }
+          }
+        }
+      });
+    }
+
+    function renderBusinesses(businesses) {
+      const container = document.getElementById("business-list");
+      container.innerHTML = "";
+
+      businesses.forEach((biz, index) => {
+        const card = document.createElement("div");
+        card.className = "business-card";
+
+        const info = document.createElement("div");
+        info.className = "business-info";
+        info.innerHTML = `
+          <div class="business-name">${biz.name}</div>
+          <div class="business-category">${biz.category} • ${biz.location}</div>
+        `;
+
+        const vibeContainer = document.createElement("div");
+        vibeContainer.className = "vibe-container";
+
+        const meter = createVibeMeter(biz.vibe_score);
+
+        const sparklineCanvas = document.createElement("canvas");
+        const sparklineId = `sparkline-${index}`;
+        sparklineCanvas.id = sparklineId;
+        sparklineCanvas.width = 120;
+        sparklineCanvas.height = 40;
+
+        vibeContainer.appendChild(meter);
+        vibeContainer.appendChild(sparklineCanvas);
+
+        card.appendChild(info);
+        card.appendChild(vibeContainer);
+        container.appendChild(card);
+
+        // Fake trend data for now (replace later with real API)
+        const fakeTrend = Array.from({ length: 30 }, () =>
+          Math.max(10, Math.min(200, biz.vibe_score + (Math.random() * 20 - 10)))
+        );
+        createSparkline(sparklineId, fakeTrend);
+      });
+    }
+
+    fetchBusinesses();
+  </script>
+</body>
+</html>
