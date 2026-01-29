@@ -16,3 +16,6 @@ review.py
 keyword-extraction.py
 vader.py
 vibe_score.py
+
+# Unused data science model files
+app/datascience_core/
