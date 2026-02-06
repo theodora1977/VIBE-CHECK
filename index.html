@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VibeCheck</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f4f9; color: #333; }
+        h1, h2, h3 { color: #2c3e50; }
+        .section { background: white; padding: 25px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .hidden { display: none; }
+        input, button { display: block; width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { background-color: #3498db; color: white; border: none; cursor: pointer; font-weight: 600; transition: background 0.2s; }
+        button:hover { background-color: #2980b9; }
+        .business-card { border-top: 1px solid #eee; padding-top: 20px; margin-top: 20px; }
+        .vibe-score { font-weight: bold; color: #27ae60; font-size: 1.1em; }
+        .error { color: #e74c3c; margin-bottom: 15px; font-size: 0.9em; }
+        .logout-btn { background-color: #95a5a6; width: auto; padding: 8px 15px; margin: 0; }
+        .logout-btn:hover { background-color: #7f8c8d; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .vibe-meter-bg { background: #eee; height: 10px; border-radius: 5px; margin: 10px 0; overflow: hidden; }
+        .vibe-meter-fill { height: 100%; background: linear-gradient(90deg, #ff6b6b, #feca57, #1dd1a1); width: 0%; transition: width 1s; }
+    </style>
+</head>
+<body>
+    <h1>VibeCheck ✅</h1>
+
+    <!-- Auth Section -->
+    <div id="auth-section" class="section">
+        <h2>Login or Signup</h2>
+        <p id="auth-message" class="error"></p>
+        <input type="email" id="email" placeholder="Email address">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Login</button>
+        <button onclick="signup()" style="background-color: #2ecc71;">Signup</button>
+    </div>
+
+    <!-- Main App Section -->
+    <div id="app-section" class="section hidden">
+        <div class="header-row">
+            <h2>Businesses</h2>
+            <button onclick="logout()" class="logout-btn">Logout</button>
+        </div>
+        
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+            <h3>Add New Business</h3>
+            <input type="text" id="bus-name" placeholder="Business Name">
+            <input type="text" id="bus-category" placeholder="Category">
+            <input type="text" id="bus-location" placeholder="Location">
+            <button onclick="addBusiness()">Add Business</button>
+        </div>
+
+        <div id="business-list"></div>
+    </div>
+
+    <script>
+        // Simple state management
+        let currentUserId = localStorage.getItem('vibecheck_uid');
+
+        function showApp() {
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('app-section').classList.remove('hidden');
+            loadBusinesses();
+        }
+
+        function showAuth() {
+            document.getElementById('auth-section').classList.remove('hidden');
+            document.getElementById('app-section').classList.add('hidden');
+        }
+
+        // Check if user is already logged in
+        if (currentUserId) {
+            showApp();
+        }
+
+        async function signup() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const msg = document.getElementById('auth-message');
+            
+            try {
+                const res = await fetch('/signup/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email, password})
+                });
+                if (res.ok) {
+                    msg.innerText = "Signup successful! Please login.";
+                    msg.style.color = "#27ae60";
+                } else {
+                    const data = await res.json();
+                    msg.innerText = data.detail || "Signup failed";
+                    msg.style.color = "#e74c3c";
+                }
+            } catch (e) { msg.innerText = "Network error"; }
+        }
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const msg = document.getElementById('auth-message');
+
+            try {
+                const res = await fetch('/login/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email, password})
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    currentUserId = data.user_id;
+                    localStorage.setItem('vibecheck_uid', currentUserId);
+                    msg.innerText = "";
+                    showApp();
+                } else {
+                    msg.innerText = "Invalid credentials";
+                    msg.style.color = "#e74c3c";
+                }
+            } catch (e) { msg.innerText = "Network error"; }
+        }
+
+        function logout() {
+            currentUserId = null;
+            localStorage.removeItem('vibecheck_uid');
+            showAuth();
+        }
+
+        async function addBusiness() {
+            const name = document.getElementById('bus-name').value;
+            const category = document.getElementById('bus-category').value;
+            const location = document.getElementById('bus-location').value;
+            
+            if(!name || !category || !location) return alert("Please fill all fields");
+
+            await fetch('/businesses/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name, category, location})
+            });
+            
+            // Clear inputs
+            document.getElementById('bus-name').value = '';
+            document.getElementById('bus-category').value = '';
+            document.getElementById('bus-location').value = '';
+            loadBusinesses();
+        }
+
+        async function loadBusinesses() {
+            const res = await fetch('/businesses/');
+            const businesses = await res.json();
+            const list = document.getElementById('business-list');
+            list.innerHTML = '';
+            
+            businesses.forEach(b => {
+                const div = document.createElement('div');
+                div.className = 'business-card';
+                div.innerHTML = `
+                    <h3>${b.name} <span style="font-size: 0.8em; color: #7f8c8d; font-weight: normal;">(${b.category})</span></h3>
+                    <p>📍 ${b.location}</p>
+                    <div style="height: 200px; width: 100%; margin-bottom: 15px; position: relative;">
+                        <canvas id="chart-${b.id}"></canvas>
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2em; font-weight: bold; color: #2c3e50;">
+                            ${b.vibe_score.toFixed(1)}
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <input type="text" id="review-${b.id}" placeholder="How's the vibe?" style="margin-bottom: 0;">
+                        <button onclick="addReview(${b.id})" style="width: auto; margin-bottom: 0; background-color: #8e44ad;">Check Vibe</button>
+                    </div>
+                `;
+                list.appendChild(div);
+
+                // Render Graph
+                new Chart(document.getElementById(`chart-${b.id}`), {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Vibe', 'Remaining'],
+                        datasets: [{
+                            data: [b.vibe_score, 10 - b.vibe_score],
+                            backgroundColor: [
+                                b.vibe_score >= 7 ? '#2ecc71' : b.vibe_score >= 4 ? '#f1c40f' : '#e74c3c',
+                                '#ecf0f1'
+                            ],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        cutout: '75%',
+                        plugins: { legend: { display: false } },
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            });
+        }
+
+        async function addReview(businessId) {
+            const content = document.getElementById(`review-${businessId}`).value;
+            if (!content) return;
+            
+            await fetch('/reviews/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    user_id: parseInt(currentUserId),
+                    business_id: businessId,
+                    content: content
+                })
+            });
+            loadBusinesses(); // Refresh to see updated score
+        }
+    </script>
+</body>
+</html>
